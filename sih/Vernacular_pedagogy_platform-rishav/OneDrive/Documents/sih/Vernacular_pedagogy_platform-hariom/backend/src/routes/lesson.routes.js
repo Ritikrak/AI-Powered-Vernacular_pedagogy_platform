@@ -7,6 +7,8 @@ const router = express.Router();
 router.get('/', lessonController.getLessons);
 router.post('/upload', upload.single('file'), lessonController.uploadLesson);
 router.get('/:id', lessonController.getLessonById);
+router.post('/:id/complete', lessonController.completeLesson);
+router.get('/:id/audio', lessonController.getLessonAudio);
 router.post('/simplify', lessonController.simplify);
 router.post('/:id/translations', lessonController.translateLesson);
 router.get('/:id/translations/:targetLanguage', (req, res, next) => {

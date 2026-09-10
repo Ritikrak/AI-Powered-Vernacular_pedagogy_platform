@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import { classroomApi, lessonApi, type Lesson, type RoomState } from './api'
 import { useApp } from './context'
 
+import { CURRICULUM_STORIES } from './curriculumStories'
+
 export default function TeacherPanelPage() {
   const { toast } = useApp()
   const navigate = useNavigate()
@@ -19,10 +21,11 @@ export default function TeacherPanelPage() {
           lessonApi.list().catch(() => []),
           classroomApi.getRoomDetails('main').catch(() => null)
         ])
-        setLessons(fetchedLessons)
+        const list = fetchedLessons && fetchedLessons.length > 0 ? fetchedLessons : CURRICULUM_STORIES
+        setLessons(list)
         setRoomState(fetchedRoom)
       } catch (err) {
-        console.warn(err)
+        setLessons(CURRICULUM_STORIES)
       }
     }
     loadData()

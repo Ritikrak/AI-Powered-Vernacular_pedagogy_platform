@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { authApi, languagesApi, type Role, type UserProfile, type VernacularLanguage } from './api'
+import { api, authApi, languagesApi, type Role, type UserProfile, type VernacularLanguage } from './api'
 
 export type ToastTone = 'success' | 'error' | 'info'
 type Toast = { id: number; message: string; tone: ToastTone }
@@ -51,6 +51,7 @@ interface AppContextValue {
   userName: string
   userEmail: string
   preferredLanguage: string
+  teacherSourceLanguage: string
   token: string | null
   languages: VernacularLanguage[]
   activeRoom: string
@@ -82,14 +83,20 @@ interface AppContextValue {
 
   // Platform Actions
   signIn: (role: Role, name: string, email?: string) => Promise<void>
+  login: (email: string, password: string) => Promise<{ success: boolean; role: Role }>
+  completeSessionLogin: (token: string, user: UserProfile, remember?: boolean) => void
+  register: (data: { name: string; email: string; password: string; role: Role; preferredLanguage?: string }) => Promise<{ success: boolean; role: Role }>
   signOut: () => void
   setPreferredLanguage: (language: string) => void
+  setTeacherSourceLanguage: (language: string) => void
   setActiveRoom: (room: string) => void
   toast: (message: string, tone?: ToastTone) => void
   updateProfile: (name: string, email?: string, language?: string) => void
   refreshLanguages: () => Promise<void>
   refreshUserProfile: () => Promise<void>
 }
+
+import { CURRICULUM_STORIES } from './curriculumStories'
 
 const defaultStudents: StudentItem[] = [
   { id: 'std-1', name: 'Aman Raj', preferredLanguage: 'Santhali', gradeLevel: 'Class 5', section: 'A', rollNumber: '01', score: 94, attendanceStatus: 'active' },
@@ -101,38 +108,16 @@ const defaultStudents: StudentItem[] = [
   { id: 'std-7', name: 'Sanjay Lugun', preferredLanguage: 'Mundari', gradeLevel: 'Class 5', section: 'B', rollNumber: '07', score: 92, attendanceStatus: 'active' }
 ]
 
-const defaultLessons: LessonItem[] = [
-  {
-    id: 'les-1',
-    title: 'जल चक्र और वर्षा (Water Cycle & Rain)',
-    subject: 'General Science',
-    gradeLevel: 'Class 5',
-    source_text: 'सूरज की गर्मी से नदियों और तालाबों का पानी भाप बनकर आसमान में उड़ता है। आसमान में यह भाप ठंडी होकर बादल बनाती है और वर्षा बनकर धरती पर लौटती है।',
-    simplified_text: 'सूरज से पानी भाप बनता है, बादल बनता है और फिर वर्षा बनकर बरसता है। इसे जल चक्र कहते हैं।',
-    status: 'published',
-    createdAt: '2026-09-01'
-  },
-  {
-    id: 'les-2',
-    title: 'प्रकाश संश्लेषण और वन (Photosynthesis)',
-    subject: 'General Science',
-    gradeLevel: 'Class 5',
-    source_text: 'पौधे अपनी हरी पत्तियों, धूप, पानी और वायु की मदद से भोजन तैयार करते हैं। इस प्रक्रिया को प्रकाश संश्लेषण कहा जाता है।',
-    simplified_text: 'पौधे धूप और पानी से अपना भोजन बनाते हैं और हमें ताज़ा हवा (ऑक्सीजन) देते हैं।',
-    status: 'published',
-    createdAt: '2026-09-03'
-  },
-  {
-    id: 'les-3',
-    title: 'झारखंड की नदियाँ और प्रकृति (Nature of Jharkhand)',
-    subject: 'EVS / भूगोल',
-    gradeLevel: 'Class 5',
-    source_text: 'दामोदर, स्वर्णरेखा और कोयल नदियाँ झारखंड के जंगलों और पहाड़ियों से होकर बहती हैं और हमारे खेतों को सींचती हैं।',
-    simplified_text: 'झारखंड की नदियाँ हमारी जीवनरेखा हैं जो पेड़-पौधों और वन्यजीवों को जीवन देती हैं।',
-    status: 'published',
-    createdAt: '2026-09-05'
-  }
-]
+const defaultLessons: LessonItem[] = CURRICULUM_STORIES.map(item => ({
+  id: String(item.id || item._id),
+  title: item.title,
+  subject: item.subject,
+  gradeLevel: item.grade_level || item.gradeLevel || 'Class 5',
+  source_text: item.source_text,
+  simplified_text: item.simplified_text || '',
+  status: 'published',
+  createdAt: '2026-09-01'
+}))
 
 const defaultDialects: DialectItem[] = [
   { id: 'sat', name: 'संथाली', englishName: 'Santhali', script: 'Ol Chiki (ᱚᱞ ᱪᱤᱠᱤ)', nativeScriptSample: 'ᱥᱟᱱᱛᱟᱲᱤ', speakersEstimate: '7.6M speakers', region: 'Santhal Pargana, Dumka', isDefault: true },
@@ -144,7 +129,7 @@ const defaultDialects: DialectItem[] = [
 const defaultActivities: ActivityItem[] = [
   { id: 'act-1', type: 'classroom', title: 'Real-time Socket.IO Engine', detail: 'Classroom Room 01 is operational with vernacular matrix', timeAgo: 'Now', dot: '✓' },
   { id: 'act-2', type: 'dialect', title: 'AI Vernacular Engine', detail: 'Santhali (Ol Chiki) & Mundari Bani enabled', timeAgo: 'Today', dot: '✓' },
-  { id: 'act-3', type: 'lesson', title: 'Curriculum Lessons Synced', detail: '3 core science lessons available in catalog', timeAgo: 'Recent', dot: '✓' }
+  { id: 'act-3', type: 'lesson', title: 'Curriculum Stories Synced', detail: '17 short stories & lessons available in vernacular catalog', timeAgo: 'Recent', dot: '✓' }
 ]
 
 const AppContext = createContext<AppContextValue | null>(null)
@@ -154,6 +139,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [userName, setUserName] = useState(() => localStorage.getItem('vernacular-name') || '')
   const [userEmail, setUserEmail] = useState(() => localStorage.getItem('vernacular-email') || '')
   const [preferredLanguage, setPreferredLangState] = useState(() => localStorage.getItem('vernacular-language') || 'Santhali')
+  const [teacherSourceLanguage, setTeacherSourceLanguageState] = useState(() => localStorage.getItem('vernacular-teacher-source-language') || 'Hindi')
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('vernacular-token'))
   const [activeRoom, setActiveRoom] = useState('main')
   const [languages, setLanguages] = useState<VernacularLanguage[]>([])
@@ -172,7 +158,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [lessons, setLessons] = useState<LessonItem[]>(() => {
     try {
       const saved = localStorage.getItem('vernacular-lessons')
-      return saved ? JSON.parse(saved) : defaultLessons
+      if (saved) {
+        const parsed = JSON.parse(saved) as LessonItem[]
+        // Ensure all 17 curriculum stories are populated while preserving custom additions
+        const existingIds = new Set(parsed.map(p => p.id))
+        const missingStories = defaultLessons.filter(dl => !existingIds.has(dl.id))
+        if (missingStories.length > 0) {
+          const merged = [...parsed, ...missingStories]
+          localStorage.setItem('vernacular-lessons', JSON.stringify(merged))
+          return merged
+        }
+        return parsed
+      }
+      return defaultLessons
     } catch {
       return defaultLessons
     }
@@ -233,7 +231,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addStudent = (studentData: Omit<StudentItem, 'id'>): StudentItem => {
     const newStudent: StudentItem = {
       ...studentData,
-      id: `std-${Date.now()}`,
+      id: `std-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       score: studentData.score || Math.floor(Math.random() * 8 + 91),
       attendanceStatus: studentData.attendanceStatus || 'active'
     }
@@ -475,11 +473,122 @@ export function AppProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('vernacular-language', language)
   }
 
+  const setTeacherSourceLanguage = (language: string) => {
+    setTeacherSourceLanguageState(language)
+    localStorage.setItem('vernacular-teacher-source-language', language)
+    addActivity('classroom', 'Teaching Language Changed', `Teaching source language set to ${language}`)
+    toast(`Teaching source language switched to ${language}`, 'success')
+  }
+
+  const login = async (email: string, password: string): Promise<{ success: boolean; role: Role }> => {
+    try {
+      const response = await authApi.login(email, password)
+      const accessToken = response.access_token || response.token || ''
+      if (accessToken) {
+        localStorage.setItem('vernacular-token', accessToken)
+        setToken(accessToken)
+      }
+
+      const user = response.user
+      const finalRole = (user?.role || 'student') as Role
+      const finalName = user?.name || email.split('@')[0]
+      const finalEmail = user?.email || email
+
+      setUserName(finalName)
+      setUserEmail(finalEmail)
+      setRole(finalRole)
+
+      localStorage.setItem('vernacular-role', finalRole)
+      localStorage.setItem('vernacular-name', finalName)
+      localStorage.setItem('vernacular-email', finalEmail)
+
+      if (user?.preferredLanguage) {
+        setPreferredLanguage(user.preferredLanguage)
+      }
+
+      toast(`Welcome back, ${finalName}! (${finalRole === 'teacher' ? 'Teacher' : 'Student'})`, 'success')
+      return { success: true, role: finalRole }
+    } catch (err: any) {
+      const msg = err.response?.data?.error || err.response?.data?.message || err.message || 'Login failed'
+      toast(msg, 'error')
+      throw new Error(msg)
+    }
+  }
+
+  const register = async (data: { name: string; email: string; password: string; role: Role; preferredLanguage?: string }): Promise<{ success: boolean; role: Role }> => {
+    try {
+      const response = await authApi.register(data)
+      const accessToken = response.access_token
+      localStorage.setItem('vernacular-token', accessToken)
+      setToken(accessToken)
+
+      const user = response.user
+      const finalRole = (user?.role || data.role) as Role
+      const finalName = user?.name || data.name
+      const finalEmail = user?.email || data.email
+
+      setUserName(finalName)
+      setUserEmail(finalEmail)
+      setRole(finalRole)
+
+      localStorage.setItem('vernacular-role', finalRole)
+      localStorage.setItem('vernacular-name', finalName)
+      localStorage.setItem('vernacular-email', finalEmail)
+
+      if (user?.preferredLanguage || data.preferredLanguage) {
+        setPreferredLanguage(user?.preferredLanguage || data.preferredLanguage || 'Santhali')
+      }
+
+      toast(`Account created! Welcome, ${finalName} (${finalRole === 'teacher' ? 'Teacher' : 'Student'})`, 'success')
+      return { success: true, role: finalRole }
+    } catch (err: any) {
+      const msg = err.response?.data?.error || err.response?.data?.message || err.message || 'Registration failed'
+      toast(msg, 'error')
+      throw new Error(msg)
+    }
+  }
+
+  const completeSessionLogin = (accessToken: string, user: UserProfile, remember = true) => {
+    localStorage.setItem('vernacular-token', accessToken)
+    setToken(accessToken)
+
+    const finalRole = (user?.role || 'student') as Role
+    const finalName = user?.name || (user?.email ? user.email.split('@')[0] : 'User')
+    const finalEmail = user?.email || ''
+
+    setUserName(finalName)
+    setUserEmail(finalEmail)
+    setRole(finalRole)
+
+    if (remember) {
+      localStorage.setItem('vernacular-role', finalRole)
+      localStorage.setItem('vernacular-name', finalName)
+      localStorage.setItem('vernacular-email', finalEmail)
+    } else {
+      sessionStorage.setItem('vernacular-role', finalRole)
+      sessionStorage.setItem('vernacular-name', finalName)
+      sessionStorage.setItem('vernacular-email', finalEmail)
+      localStorage.removeItem('vernacular-role')
+      localStorage.removeItem('vernacular-name')
+      localStorage.removeItem('vernacular-email')
+    }
+
+    if (user?.preferredLanguage) {
+      setPreferredLanguage(user.preferredLanguage)
+    }
+
+    toast(`Welcome, ${finalName}! (${finalRole === 'teacher' ? 'Teacher' : 'Student'})`, 'success')
+  }
+
   const signOut = () => {
+    authApi.logout().catch(() => {})
     localStorage.removeItem('vernacular-role')
     localStorage.removeItem('vernacular-name')
     localStorage.removeItem('vernacular-email')
     localStorage.removeItem('vernacular-token')
+    sessionStorage.removeItem('vernacular-role')
+    sessionStorage.removeItem('vernacular-name')
+    sessionStorage.removeItem('vernacular-email')
     setRole(null)
     setUserName('')
     setUserEmail('')
@@ -512,8 +621,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteDialect,
       addActivity,
       signIn,
+      login,
+      completeSessionLogin,
+      register,
       signOut,
       setPreferredLanguage,
+      teacherSourceLanguage,
+      setTeacherSourceLanguage,
       setActiveRoom,
       toast,
       updateProfile,
@@ -525,6 +639,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       userName,
       userEmail,
       preferredLanguage,
+      teacherSourceLanguage,
       token,
       languages,
       activeRoom,

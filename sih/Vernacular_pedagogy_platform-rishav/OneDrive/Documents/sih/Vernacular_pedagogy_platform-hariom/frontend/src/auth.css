@@ -692,34 +692,43 @@
   text-decoration: underline;
 }
 
-/* --- Submit CTA Button --- */
+/* --- Submit CTA Button (Solid Purple) --- */
 .primary-cta-pro {
-  height: 46px;
+  height: 48px;
   border: 0;
   border-radius: 10px;
-  background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);
+  background: #7c3aed; /* Solid Purple */
   color: #ffffff;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 700;
   letter-spacing: 0.01em;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 9px;
   cursor: pointer;
-  box-shadow: 0 4px 14px -2px rgba(79, 70, 229, 0.4);
+  box-shadow: 0 4px 14px -2px rgba(124, 58, 237, 0.45);
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  margin-top: 6px;
+  margin-top: 8px;
+  width: 100%;
 }
 
-.primary-cta-pro:hover {
-  background: linear-gradient(135deg, #4338ca 0%, #312e81 100%);
-  box-shadow: 0 8px 22px -4px rgba(79, 70, 229, 0.5);
+.primary-cta-pro:hover:not(:disabled) {
+  background: #6d28d9; /* Deep Solid Purple */
+  box-shadow: 0 8px 24px -4px rgba(109, 40, 217, 0.55);
   transform: translateY(-1px);
 }
 
-.primary-cta-pro:active {
+.primary-cta-pro:active:not(:disabled) {
+  background: #5b21b6;
   transform: translateY(0);
+}
+
+.primary-cta-pro:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 /* --- Divider --- */
@@ -742,7 +751,71 @@
   background: #e2e8f0;
 }
 
-/* --- Google SSO Button --- */
+/* --- Centered Google SSO Authentication Container --- */
+.google-center-auth-box {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border: 1.5px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  box-shadow: 0 4px 20px -4px rgba(99, 102, 241, 0.12), 0 1px 3px rgba(0, 0, 0, 0.04);
+  animation: fadeInUpGoogle 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.2s ease;
+}
+
+.google-center-auth-box:hover {
+  border-color: #c7d2fe;
+  box-shadow: 0 6px 24px -4px rgba(99, 102, 241, 0.18);
+}
+
+@keyframes fadeInUpGoogle {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.google-center-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.google-role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  transition: all 0.2s ease;
+}
+
+.google-role-badge.teacher-badge {
+  background: #eef2ff;
+  color: #4338ca;
+  border: 1px solid #c7d2fe;
+}
+
+.google-role-badge.student-badge {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
 .google-sso-btn {
   display: flex;
   align-items: center;
@@ -751,24 +824,106 @@
   height: 44px;
   background: #ffffff;
   border: 1px solid #cbd5e1;
-  border-radius: 9px;
+  border-radius: 10px;
   color: #1e293b;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   text-decoration: none;
-  transition: all 0.15s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
-.google-sso-btn:hover {
-  background: #f8fafc;
-  border-color: #94a3b8;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.06);
+.google-sso-btn-center {
+  width: 100%;
+  max-width: 360px;
+  height: 46px;
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
+}
+
+.google-sso-btn-center:hover {
+  background: #ffffff;
+  border-color: #4f46e5;
+  color: #1e1b4b;
+  transform: translateY(-1.5px);
+  box-shadow: 0 8px 20px -3px rgba(79, 70, 229, 0.2);
+}
+
+.google-sso-btn-center:active {
+  transform: translateY(0);
+}
+
+.google-arrow-icon {
+  margin-left: auto;
+  color: #94a3b8;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.google-sso-btn-center:hover .google-arrow-icon {
+  transform: translateX(3px);
+  color: #4f46e5;
 }
 
 .google-icon-svg {
   width: 18px;
   height: 18px;
+  flex-shrink: 0;
+}
+
+.google-center-subtext {
+  font-size: 10.5px;
+  color: #64748b;
+  margin: 10px 0 0 0;
+  text-align: center;
+}
+
+/* --- Role Selection Guide Box (Shown when role is not yet selected) --- */
+.select-role-guide-box {
+  background: linear-gradient(135deg, rgba(248, 250, 252, 0.95), rgba(241, 245, 249, 0.85));
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  animation: fadeInGuide 0.25s ease-out;
+}
+
+@keyframes fadeInGuide {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.select-role-guide-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: #e0e7ff;
+  color: #4f46e5;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.select-role-guide-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.select-role-guide-content strong {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.select-role-guide-content span {
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.4;
 }
 
 .auth-security-notice {
@@ -1247,4 +1402,67 @@
   justify-content: space-between;
 }
 
+/* ================= MODERN PRO ROLE TABS ================= */
+.auth-role-tabs-pro {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  background: #f1f5f9;
+  padding: 5px;
+  border-radius: 14px;
+  margin-bottom: 22px;
+  border: 1px solid #e2e8f0;
+}
 
+.auth-role-tab-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #64748b;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.auth-role-tab-btn:hover {
+  color: #0f172a;
+}
+
+.auth-role-tab-btn.active {
+  background: #ffffff;
+  color: #7c3aed;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.auth-role-tab-btn.active svg {
+  color: #7c3aed;
+}
+
+/* ================= VALIDATION ALERT BOX ================= */
+.auth-alert-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border-radius: 9px;
+  background: #fef2f2;
+  border: 1.5px solid #fca5a5;
+  color: #b91c1c;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-bottom: 14px;
+  animation: shakeAlert 0.3s ease-in-out;
+}
+
+@keyframes shakeAlert {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
+}

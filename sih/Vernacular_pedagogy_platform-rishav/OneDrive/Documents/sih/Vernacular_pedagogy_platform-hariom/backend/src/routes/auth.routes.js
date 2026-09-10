@@ -11,12 +11,15 @@ router.post('/demo-login', authLimiter, authController.demoLogin);
 
 // Standard auth
 router.post('/login', authLimiter, authController.login);
+router.post('/verify-otp', authLimiter, authController.verifyOtp);
+router.post('/resend-otp', authLimiter, authController.resendOtp);
 router.post('/register', authLimiter, authController.register);
 router.get('/me', verifyToken, authController.getMe);
+router.post('/logout', authController.logout);
 
-// OAuth mock redirect for Google
-router.get('/google', (req, res) => {
-  res.redirect(`${req.headers.referer || 'http://localhost:5173'}/dashboard?google_oauth=demo`);
-});
+// Google OAuth 2.0 routes
+router.get('/google', authController.googleAuth);
+router.get('/google/callback', authController.googleCallback);
 
 export default router;
+

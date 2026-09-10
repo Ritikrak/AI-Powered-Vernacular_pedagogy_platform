@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { BookOpen, FileText, Plus, Search, Sparkles, Upload, Volume2, Globe, Check, Eye, ChevronRight, X } from 'lucide-react'
-import { lessonApi, type Lesson } from './api'
+import { lessonApi, playVernacularAudio, type Lesson } from './api'
 import { useApp } from './context'
+import { CURRICULUM_STORIES } from './curriculumStories'
 
 export default function LessonsPage() {
   const { role, toast } = useApp()
@@ -14,8 +15,8 @@ export default function LessonsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [lessonTitle, setLessonTitle] = useState('')
-  const [lessonSubject, setLessonSubject] = useState('General Science')
-  const [lessonGrade, setLessonGrade] = useState('Class 5')
+  const [lessonSubject, setLessonSubject] = useState('Moral Stories / बाल साहित्य')
+  const [lessonGrade, setLessonGrade] = useState('Class 3')
   const [lessonSourceText, setLessonSourceText] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -27,14 +28,16 @@ export default function LessonsPage() {
     translated_text: string
     phonetic_text?: string
   } | null>(null)
+  const [playingAudioKey, setPlayingAudioKey] = useState<string | null>(null)
 
   const loadLessons = async () => {
     setLoading(true)
     try {
       const data = await lessonApi.list()
-      setLessons(data)
+      const combined = data && data.length > 0 ? data : CURRICULUM_STORIES
+      setLessons(combined)
     } catch {
-      toast('Could not fetch lessons from server. Showing local catalog.', 'info')
+      setLessons(CURRICULUM_STORIES)
     } finally {
       setLoading(false)
     }
@@ -85,6 +88,43 @@ export default function LessonsPage() {
   const handleTranslateLesson = async (lessonId: string | number, targetLang: string) => {
     setTranslatingLang(targetLang)
     try {
+      // 1. Direct check in activeLesson.translations
+      if (activeLesson && activeLesson.translations && activeLesson.translations.length > 0) {
+        const found = activeLesson.translations.find(
+          t => t.language.toLowerCase() === targetLang.toLowerCase()
+        )
+        if (found) {
+          setActiveTranslation({
+            language: targetLang,
+            translated_text: found.translated_text,
+            phonetic_text: found.phonetic_text
+          })
+          toast(`Lesson translated into ${targetLang}!`, 'success')
+          setTranslatingLang(null)
+          return
+        }
+      }
+
+      // 2. Fallback check in CURRICULUM_STORIES
+      const matched = CURRICULUM_STORIES.find(
+        s => String(s.id) === String(lessonId) || (activeLesson && s.title.toLowerCase() === activeLesson.title.toLowerCase())
+      )
+      if (matched && matched.translations) {
+        const found = matched.translations.find(
+          t => t.language.toLowerCase() === targetLang.toLowerCase()
+        )
+        if (found) {
+          setActiveTranslation({
+            language: targetLang,
+            translated_text: found.translated_text,
+            phonetic_text: found.phonetic_text
+          })
+          toast(`Lesson translated into ${targetLang}!`, 'success')
+          setTranslatingLang(null)
+          return
+        }
+      }
+
       const res = await lessonApi.translateLesson(lessonId, targetLang)
       setActiveTranslation({
         language: targetLang,
@@ -100,13 +140,22 @@ export default function LessonsPage() {
     }
   }
 
-  const playSpeech = (text: string) => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel()
-      const utterance = new SpeechSynthesisUtterance(text)
-      utterance.rate = 0.9
-      window.speechSynthesis.speak(utterance)
-    }
+  const playSpeech = (text: string, language = 'Hindi', phonetic = '', key = '') => {
+    if (key) setPlayingAudioKey(key)
+    playVernacularAudio({
+      text,
+      language,
+      phonetic: phonetic || text,
+      onStart: () => {
+        if (key) setPlayingAudioKey(key)
+      },
+      onEnd: () => {
+        setPlayingAudioKey(null)
+      },
+      onError: () => {
+        setPlayingAudioKey(null)
+      }
+    })
   }
 
   const filteredLessons = lessons.filter(lesson => {
@@ -157,11 +206,12 @@ export default function LessonsPage() {
           onChange={e => setSelectedSubject(e.target.value)}
           className="bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
         >
-          <option value="All">All Subjects</option>
+          <option value="All">All Subjects ({lessons.length})</option>
+          <option value="Moral Stories / बाल साहित्य">📖 Moral Stories / बाल साहित्य</option>
           <option value="Science">Science</option>
           <option value="General Science">General Science</option>
-          <option value="EVS">EVS</option>
-          <option value="Social Studies">Social Studies</option>
+          <option value="EVS">EVS / पर्यावरण</option>
+          <option value="Social Studies">Social Studies / इतिहास</option>
         </select>
       </div>
 
@@ -296,6 +346,8 @@ export default function LessonsPage() {
                     onChange={e => setLessonGrade(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
+                    <option>Class 1</option>
+                    <option>Class 2</option>
                     <option>Class 3</option>
                     <option>Class 4</option>
                     <option>Class 5</option>
@@ -378,10 +430,15 @@ export default function LessonsPage() {
                     </span>
                     <button
                       type="button"
-                      onClick={() => playSpeech(activeLesson.simplified_text || activeLesson.simplifiedText || '')}
-                      className="text-emerald-700 hover:text-emerald-900 text-xs flex items-center gap-1 font-semibold"
+                      onClick={() => playSpeech(activeLesson.simplified_text || activeLesson.simplifiedText || '', 'Hindi', '', 'hindi-simplified')}
+                      className={`text-xs flex items-center gap-1 font-semibold px-2 py-1 rounded transition-colors ${
+                        playingAudioKey === 'hindi-simplified'
+                          ? 'text-emerald-950 bg-emerald-200 animate-pulse'
+                          : 'text-emerald-700 hover:text-emerald-900'
+                      }`}
                     >
-                      <Volume2 size={13} /> Read Aloud
+                      <Volume2 size={13} className={playingAudioKey === 'hindi-simplified' ? 'animate-bounce' : ''} />
+                      {playingAudioKey === 'hindi-simplified' ? 'Reading...' : 'Read Aloud'}
                     </button>
                   </div>
                   <p className="text-xs text-emerald-950 font-medium leading-relaxed">
@@ -424,10 +481,15 @@ export default function LessonsPage() {
                     </strong>
                     <button
                       type="button"
-                      onClick={() => playSpeech(activeTranslation.translated_text)}
-                      className="text-xs font-bold text-indigo-700 hover:text-indigo-900 flex items-center gap-1"
+                      onClick={() => playSpeech(activeTranslation.translated_text, activeTranslation.language, activeTranslation.phonetic_text, 'vernacular-output')}
+                      className={`text-xs font-bold flex items-center gap-1 px-2.5 py-1 rounded-lg transition-colors ${
+                        playingAudioKey === 'vernacular-output'
+                          ? 'bg-emerald-600 text-white animate-pulse'
+                          : 'text-indigo-700 hover:text-indigo-900 bg-white/70 hover:bg-white'
+                      }`}
                     >
-                      <Volume2 size={14} /> Listen Pronunciation
+                      <Volume2 size={14} className={playingAudioKey === 'vernacular-output' ? 'animate-bounce' : ''} />
+                      {playingAudioKey === 'vernacular-output' ? 'Playing...' : 'Listen Pronunciation'}
                     </button>
                   </div>
                   <p className="text-sm font-bold text-indigo-950 leading-relaxed">

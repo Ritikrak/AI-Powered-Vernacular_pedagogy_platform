@@ -125,6 +125,17 @@ async function runTests() {
     if (data.roomCode !== 'main') throw new Error(`Unexpected roomCode: ${data.roomCode}`);
   });
 
+  // 10. Google OAuth Redirect
+  await test('GET /api/auth/google returns 302 redirect with Client ID', async () => {
+    const res = await fetch(`${BASE_URL}/api/auth/google`, { redirect: 'manual' });
+    if (res.status !== 302) throw new Error(`Expected 302 status, got ${res.status}`);
+    const location = res.headers.get('location');
+    if (!location || !location.includes('accounts.google.com') || !location.includes('678831874585')) {
+      throw new Error(`Location header missing or invalid: ${location}`);
+    }
+  });
+
+
   console.log(`\n===================================`);
   console.log(`Test Results: ${passed} Passed, ${failed} Failed`);
   console.log(`===================================\n`);
@@ -133,3 +144,4 @@ async function runTests() {
 }
 
 runTests();
+

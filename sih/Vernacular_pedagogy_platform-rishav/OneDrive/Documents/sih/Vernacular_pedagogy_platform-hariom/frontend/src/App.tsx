@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import {
+  AlertCircle,
+  ArrowLeft,
   ArrowRight,
-  BarChart3,
   BookOpen,
   Check,
   CheckCircle2,
@@ -23,6 +24,7 @@ import {
   Menu,
   Mic,
   Radio,
+  RefreshCw,
   School,
   Settings,
   Shield,
@@ -30,15 +32,15 @@ import {
   Sparkles,
   UserCheck,
   Users,
-  Volume2
+  Volume2,
+  Layers
 } from 'lucide-react'
-import { googleLoginUrl, lessonApi, classroomApi, type Role } from './api'
+import { lessonApi, classroomApi, authApi, type Role } from './api'
 import { useApp } from './context'
 import {
   StudentsModal,
   LessonsModal,
-  DialectsModal,
-  ComprehensionModal
+  DialectsModal
 } from './DashboardModals'
 import GoogleClassroomPage from './GoogleClassroomPage'
 import GoogleTranslatorPage from './GoogleTranslatorPage'
@@ -48,10 +50,12 @@ import StudentLearningPage from './StudentLearningPage'
 import TeacherPanelPage from './TeacherPanelPage'
 import StudentsPage from './StudentsPage'
 import SettingsPage from './SettingsPage'
+import NipunWorksheetsPage from './NipunWorksheetsPage'
 
 const teacherNav = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
   { label: 'Live Classroom', icon: Headphones, path: '/live-classroom' },
+  { label: 'NIPUN Worksheets & Cards', icon: Layers, path: '/worksheets' },
   { label: 'Lessons Repository', icon: FileText, path: '/lessons' },
   { label: 'Translated Lessons', icon: Languages, path: '/translated-lessons' },
   { label: 'Teacher Studio', icon: BookOpen, path: '/teacher-panel' },
@@ -63,16 +67,39 @@ const teacherNav = [
 const studentNav = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
   { label: 'My Learning Desk', icon: BookOpen, path: '/my-learning' },
+  { label: 'Bilingual Flashcards', icon: Layers, path: '/worksheets' },
   { label: 'Live Classroom', icon: Headphones, path: '/live-classroom' },
   { label: 'Lesson Catalog', icon: FileText, path: '/lessons' },
   { label: 'Translation Studio', icon: Languages, path: '/live-session' },
   { label: 'Settings', icon: Settings, path: '/settings' }
 ]
 
+export const TEACHER_SOURCE_LANGUAGES = [
+  { code: 'hi', name: 'Hindi', native: 'हिंदी', glyph: 'अ' },
+  { code: 'en', name: 'English', native: 'English', glyph: 'A' },
+  { code: 'bn', name: 'Bengali', native: 'বাংলা', glyph: 'অ' },
+  { code: 'or', name: 'Odia', native: 'ଓଡ଼ିଆ', glyph: 'ଅ' },
+  { code: 'sat', name: 'Santhali', native: 'ᱥᱟᱱᱛᱟᱲᱤ', glyph: 'ᱚ' },
+  { code: 'kru', name: 'Kurukh', native: 'कुड़ुख़', glyph: 'क' }
+]
+
+export const STUDENT_MOTHER_TONGUES = [
+  { code: 'sat', name: 'Santhali', native: 'संथाली / ᱥᱟᱱᱛᱟᱲᱤ', glyph: 'ᱚ' },
+  { code: 'kru', name: 'Kurukh', native: 'कुड़ुख़ / ᱛᱚᱞᱚᱝ ᱥᱤᱠᱤ', glyph: 'क' },
+  { code: 'unr', name: 'Mundari', native: 'मुंडारी / ᱢᱩᱱᱰᱟᱨᱤ', glyph: 'ᱢ' },
+  { code: 'hoc', name: 'Ho', native: 'हो / ᱦᱳ', glyph: 'ᱦ' },
+  { code: 'hi', name: 'Hindi', native: 'हिंदी', glyph: 'अ' },
+  { code: 'en', name: 'English', native: 'English', glyph: 'A' }
+]
+
 function Dashboard() {
-  const { userName, role, preferredLanguage, students, lessons, dialects, activities, comprehensionGain } = useApp()
+  const { userName, role, preferredLanguage, teacherSourceLanguage, students, lessons, dialects, activities } = useApp()
   const navigate = useNavigate()
-  const [activeModal, setActiveModal] = useState<'students' | 'lessons' | 'dialects' | 'comprehension' | null>(null)
+  const [activeModal, setActiveModal] = useState<'students' | 'lessons' | 'dialects' | null>(null)
+
+  const activeGlyph = role === 'teacher'
+    ? (TEACHER_SOURCE_LANGUAGES.find(l => l.name === teacherSourceLanguage)?.glyph || 'अ')
+    : (STUDENT_MOTHER_TONGUES.find(l => l.name === preferredLanguage)?.glyph || 'ᱚ')
 
   return (
     <>
@@ -85,10 +112,10 @@ function Dashboard() {
           👩🏾‍🏫<small>👦🏽 👧🏽 👦🏽</small>
         </div>
         <div className="teaching-language">
-          <b>अ</b>
+          <b>{activeGlyph}</b>
           <span>
-            {role === 'teacher' ? 'Teaching Language' : 'Mother Tongue'}
-            <strong>{role === 'teacher' ? 'हिंदी (Hindi)' : `${preferredLanguage}`}</strong>
+            {role === 'teacher' ? 'Teaching Source' : 'Mother Tongue'}
+            <strong>{role === 'teacher' ? `${teacherSourceLanguage} Source` : `${preferredLanguage}`}</strong>
           </span>
         </div>
       </section>
@@ -125,16 +152,6 @@ function Dashboard() {
           actionHint="Add / Remove Dialects"
           onClick={() => setActiveModal('dialects')}
         />
-        <Metric
-          icon={BarChart3}
-          value={`${comprehensionGain}%`}
-          label="Comprehension Gain"
-          note="Vernacular Pedagogy"
-          color="orange"
-          badge="Analytics"
-          actionHint="View Comprehension Analytics"
-          onClick={() => setActiveModal('comprehension')}
-        />
       </section>
 
       {/* Interactive Modal Drawers */}
@@ -146,9 +163,6 @@ function Dashboard() {
       )}
       {activeModal === 'dialects' && (
         <DialectsModal onClose={() => setActiveModal(null)} />
-      )}
-      {activeModal === 'comprehension' && (
-        <ComprehensionModal onClose={() => setActiveModal(null)} />
       )}
 
       <section className="dashboard-summary">
@@ -333,15 +347,35 @@ function Sidebar({ close }: { close: () => void }) {
 }
 
 function Shell() {
-  const { role, signOut, preferredLanguage } = useApp()
+  const {
+    role,
+    preferredLanguage,
+    setPreferredLanguage,
+    teacherSourceLanguage,
+    setTeacherSourceLanguage
+  } = useApp()
   const [open, setOpen] = useState(false)
+  const [langMenuOpen, setLangMenuOpen] = useState(false)
+  const langMenuRef = useRef<HTMLDivElement | null>(null)
   const location = useLocation()
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (langMenuRef.current && !langMenuRef.current.contains(e.target as Node)) {
+        setLangMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const allItems = [...teacherNav, ...studentNav]
   const currentItem = allItems.find(item => item.path === location.pathname)
   const title = currentItem ? currentItem.label : 'Dashboard'
 
-  if (!role) return <Navigate to="/" replace />
+  const storedRole = typeof window !== 'undefined' ? localStorage.getItem('vernacular-role') : null
+
+  if (!role && !storedRole) return <Navigate to="/" replace />
 
   return (
     <div className="app-shell">
@@ -358,20 +392,112 @@ function Shell() {
             <strong>{title}</strong>
           </div>
 
-          <div className="header-tools">
-            <span className="text-xs bg-slate-100 text-slate-700 px-3 py-1 rounded-lg font-medium hidden sm:inline-block">
-              {role === 'teacher' ? 'Hindi Source' : `Mother Tongue: ${preferredLanguage}`}
-            </span>
-            <button className="header-signout" onClick={signOut} aria-label="Sign out" title="Sign out">
-              <LogOut size={16} />
-            </button>
+          <div className="header-tools flex items-center gap-2">
+            {role === 'teacher' ? (
+              <div className="relative inline-block" ref={langMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setLangMenuOpen(prev => !prev)}
+                  className="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 px-3 py-1.5 rounded-lg font-medium flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                  title="Click to switch teaching source language"
+                  aria-label="Change Teaching Source Language"
+                  aria-expanded={langMenuOpen}
+                >
+                  <Languages size={13} className="text-indigo-600" />
+                  <span>
+                    <strong className="font-semibold text-indigo-800">{teacherSourceLanguage}</strong> Source
+                  </span>
+                  <ChevronDown
+                    size={12}
+                    className={`text-indigo-500 transition-transform duration-200 ${langMenuOpen ? 'rotate-180' : ''}`}
+                  />
+                </button>
+
+                {langMenuOpen && (
+                  <div className="absolute right-0 mt-1.5 w-48 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in zoom-in-95">
+                    <div className="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      Teaching Source Language
+                    </div>
+                    {TEACHER_SOURCE_LANGUAGES.map(lang => (
+                      <button
+                        key={lang.name}
+                        type="button"
+                        onClick={() => {
+                          setTeacherSourceLanguage(lang.name)
+                          setLangMenuOpen(false)
+                        }}
+                        className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer ${
+                          teacherSourceLanguage === lang.name
+                            ? 'text-indigo-600 font-semibold bg-indigo-50/60'
+                            : 'text-slate-700'
+                        }`}
+                      >
+                        <span>
+                          {lang.name} <span className="text-slate-400 text-[11px]">({lang.native})</span>
+                        </span>
+                        {teacherSourceLanguage === lang.name && <Check size={13} className="text-indigo-600" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="relative inline-block" ref={langMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setLangMenuOpen(prev => !prev)}
+                  className="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 px-3 py-1.5 rounded-lg font-medium flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                  title="Click to switch your mother tongue"
+                  aria-label="Change Mother Tongue"
+                  aria-expanded={langMenuOpen}
+                >
+                  <Languages size={13} className="text-emerald-600" />
+                  <span>
+                    Mother Tongue: <strong className="font-semibold text-emerald-900">{preferredLanguage}</strong>
+                  </span>
+                  <ChevronDown
+                    size={12}
+                    className={`text-emerald-600 transition-transform duration-200 ${langMenuOpen ? 'rotate-180' : ''}`}
+                  />
+                </button>
+
+                {langMenuOpen && (
+                  <div className="absolute right-0 mt-1.5 w-52 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in zoom-in-95">
+                    <div className="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      Select Mother Tongue
+                    </div>
+                    {STUDENT_MOTHER_TONGUES.map(lang => (
+                      <button
+                        key={lang.name}
+                        type="button"
+                        onClick={() => {
+                          setPreferredLanguage(lang.name)
+                          setLangMenuOpen(false)
+                        }}
+                        className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer ${
+                          preferredLanguage === lang.name
+                            ? 'text-emerald-600 font-semibold bg-emerald-50/60'
+                            : 'text-slate-700'
+                        }`}
+                      >
+                        <span>
+                          {lang.name} <span className="text-slate-400 text-[11px]">({lang.native})</span>
+                        </span>
+                        {preferredLanguage === lang.name && <Check size={13} className="text-emerald-600" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </header>
 
         <main className="content">
           <Routes>
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/live-classroom" element={<GoogleClassroomPage role={role} />} />
+            <Route path="/live-classroom" element={<GoogleClassroomPage role={role || 'teacher'} />} />
+            <Route path="/worksheets" element={<NipunWorksheetsPage />} />
             <Route path="/lessons" element={<LessonsPage />} />
             <Route path="/translated-lessons" element={<TranslatedLessonsPage />} />
             <Route path="/teacher-panel" element={<TeacherPanelPage />} />
@@ -400,94 +526,97 @@ export default function App() {
   )
 }
 
-function getLoginDetailsInfo(email: string, role: Role, passwordLength: number, fullName = '') {
+const DISPOSABLE_EMAIL_DOMAINS = [
+  'mailinator.com',
+  'tempmail.com',
+  'temp-mail.org',
+  '10minutemail.com',
+  'guerrillamail.com',
+  'sharklasers.com',
+  'trashmail.com',
+  'yopmail.com',
+  'throwawaymail.com',
+  'dispostable.com',
+  'getairmail.com',
+  'fakemailgenerator.com',
+  'mohmal.com',
+  'generator.email',
+  'dropmail.me',
+  'crazymailing.com',
+  'tempmailo.com',
+  'maildrop.cc',
+  'inboxkitten.com',
+  'nada.ltd',
+  'burnermail.io',
+  'emailondeck.com',
+  'mytemp.email',
+  'fakemail.net',
+  'tempinbox.com',
+  'trashmail.net',
+  'trashmail.org',
+  'tempr.email',
+  'discard.email',
+  'spambog.com',
+  'boun.cr',
+  'jetable.org',
+  'luxusmail.org',
+  'mytempemail.com'
+]
+
+function getLoginDetailsInfo(email: string, role: Role | null, passwordLength: number) {
   const norm = email.trim().toLowerCase()
-  const nameNorm = fullName.trim()
 
   const isTeacherKeyword =
     norm.includes('teacher') ||
     norm.includes('prof') ||
     norm.includes('faculty') ||
-    norm.includes('machet') ||
+    norm.includes('tch-') ||
     norm.includes('educator')
   const isStudentKeyword =
     norm.includes('student') ||
     norm.includes('pathua') ||
-    norm.includes('shiksha') ||
     norm.includes('pupil') ||
-    norm.includes('learner') ||
-    norm.includes('child')
-  const isGoogle = norm.includes('@gmail.com') || norm.includes('@google.com')
+    norm.includes('learner')
   const isInstitution =
     norm.includes('@lokshiksha.in') || norm.includes('.edu') || norm.includes('.gov') || norm.includes('.ac.in')
 
-  let detectedRole: Role = role
+  let detectedRole: Role | null = role
   if (isTeacherKeyword && !isStudentKeyword) detectedRole = 'teacher'
   else if (isStudentKeyword && !isTeacherKeyword) detectedRole = 'student'
 
   let PrimaryIcon = Shield
   let EmailIcon = Mail
   let emailColor = 'text-slate-400'
-  let title = nameNorm || 'Sign in to Workspace'
-  let badge = 'Workspace Account'
-  let badgeClass = ''
-  let identityClass = ''
-  let iconBoxClass = 'default'
+  let title = role ? `${role === 'teacher' ? 'Teacher' : 'Student'} Workspace` : 'LokShiksha Workspace'
+  let badge = role ? `${role === 'teacher' ? 'Teacher / शिक्षक' : 'Student / विद्यार्थी'} Profile` : 'Select Role'
+  let badgeClass = role ? (role === 'teacher' ? 'teacher-text' : 'student-text') : ''
+  let identityClass = role ? (role === 'teacher' ? 'teacher-active' : 'student-active') : ''
+  let iconBoxClass = role ? (role === 'teacher' ? 'teacher' : 'student') : 'default'
   let isVerified = false
 
   if (detectedRole === 'teacher' || isTeacherKeyword) {
     PrimaryIcon = GraduationCap
     EmailIcon = GraduationCap
-    emailColor = 'text-emerald-500'
+    emailColor = 'text-purple-600'
     badge = 'Teacher / शिक्षक Profile'
     badgeClass = 'teacher-text'
     identityClass = 'teacher-active'
     iconBoxClass = 'teacher'
     isVerified = isInstitution || isTeacherKeyword
-    title = nameNorm
-      ? `${nameNorm} (Teacher)`
-      : (norm.split('@')[0] ? `${norm.split('@')[0]} (Teacher Studio)` : 'Teacher Classroom Studio')
+    title = norm.split('@')[0] ? `${norm.split('@')[0]} (Teacher Studio)` : 'Teacher Classroom Studio'
   } else if (detectedRole === 'student' || isStudentKeyword) {
     PrimaryIcon = Sparkles
     EmailIcon = Sparkles
-    emailColor = 'text-indigo-500'
+    emailColor = 'text-purple-600'
     badge = 'Student / विद्यार्थी Profile'
     badgeClass = 'student-text'
     identityClass = 'student-active'
     iconBoxClass = 'student'
-    isVerified = isInstitution || isStudentKeyword
-    title = nameNorm
-      ? `${nameNorm} (Student)`
-      : (norm.split('@')[0] ? `${norm.split('@')[0]} (Learner Desk)` : 'Student Vernacular Desk')
-  } else if (isGoogle) {
-    PrimaryIcon = Globe
-    EmailIcon = Globe
-    emailColor = 'text-blue-500'
-    badge = 'Google Workspace'
-    badgeClass = 'google-text'
-    identityClass = 'google-active'
-    iconBoxClass = 'google'
-    isVerified = true
-    title = nameNorm ? `${nameNorm} (Google SSO)` : (norm.split('@')[0] ? `${norm.split('@')[0]} (Google SSO)` : 'Google Account')
-  } else if (isInstitution) {
-    PrimaryIcon = School
-    EmailIcon = School
-    emailColor = 'text-purple-500'
-    badge = 'Institutional Pedagogy'
-    badgeClass = ''
-    identityClass = 'institution-active'
-    iconBoxClass = 'institution'
-    isVerified = true
-    title = nameNorm ? `${nameNorm} (Institutional)` : (norm.split('@')[0] ? `${norm.split('@')[0]} (Institutional)` : 'Institution Member')
-  } else if (nameNorm || norm.length > 0) {
-    PrimaryIcon = UserCheck
-    EmailIcon = UserCheck
-    emailColor = 'text-slate-600'
-    badge = 'Personal Account'
-    title = nameNorm || norm.split('@')[0] || 'Learning Profile'
+    isVerified = isInstitution
+    title = norm.split('@')[0] ? `${norm.split('@')[0]} (Learner Desk)` : 'Student Vernacular Desk'
   }
 
-  // Password icon and state
+  // Password state
   let PasswordIcon = Lock
   let passwordColor = 'text-slate-400'
   let passwordHint = 'Minimum 6 characters required'
@@ -529,18 +658,21 @@ function getLoginDetailsInfo(email: string, role: Role, passwordLength: number, 
 }
 
 function Auth() {
-  const { role, signIn } = useApp()
+  const { role, completeSessionLogin, teacherSourceLanguage, toast } = useApp()
   const [selected, setSelected] = useState<Role>('teacher')
-  const [fullName, setFullName] = useState(() => localStorage.getItem('vernacular-name') || '')
   const [email, setEmail] = useState(() => localStorage.getItem('vernacular-email') || '')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [remember, setRemember] = useState(true)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
   const [activeLang, setActiveLang] = useState<'santhali' | 'mundari' | 'ho' | 'kurukh'>('santhali')
 
-  const loginInfo = getLoginDetailsInfo(email, selected, password.length, fullName)
+  const loginInfo = getLoginDetailsInfo(email, selected, password.length)
+  const storedRole = typeof window !== 'undefined' ? (localStorage.getItem('vernacular-role') || sessionStorage.getItem('vernacular-role')) : null
 
-  if (role) return <Navigate to="/dashboard" replace />
+  if (role || storedRole) return <Navigate to="/dashboard" replace />
 
   const previewData = {
     santhali: {
@@ -575,39 +707,124 @@ function Auth() {
 
   const handleFillDemo = (demoRole: Role) => {
     setSelected(demoRole)
+    setErrorMessage(null)
     if (demoRole === 'teacher') {
-      setFullName('Teacher Demo')
       setEmail('teacher@lokshiksha.in')
       setPassword('teacher@2026')
     } else {
-      setFullName('Student Demo')
       setEmail('student@lokshiksha.in')
       setPassword('student@2026')
     }
   }
 
-  const handleEmailChange = (newEmail: string) => {
-    setEmail(newEmail)
-    const norm = newEmail.toLowerCase()
-    if (norm.includes('teacher') || norm.includes('prof') || norm.includes('educator')) {
-      setSelected('teacher')
-    } else if (norm.includes('student') || norm.includes('pupil') || norm.includes('learner')) {
-      setSelected('student')
+  const handleSwitchTab = (tab: Role) => {
+    setSelected(tab)
+    setErrorMessage(null)
+    setPassword('')
+  }
+
+  const validateStudentEmailStrict = (emailStr: string): boolean => {
+    const norm = emailStr.trim().toLowerCase()
+    if (!norm) return false
+
+    // Disposable/fake domain check
+    const domain = norm.includes('@') ? norm.split('@')[1] : ''
+    const isDisposable = DISPOSABLE_EMAIL_DOMAINS.some(d => domain === d || domain.endsWith(`.${d}`))
+
+    if (isDisposable || !norm.endsWith('@lokshiksha.in')) {
+      setErrorMessage('Please use your official institutional email.')
+      return false
+    }
+
+    return true
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setErrorMessage(null)
+
+    // STUDENT FLOW
+    if (selected === 'student') {
+      if (!validateStudentEmailStrict(email)) {
+        return
+      }
+
+      setIsSubmitting(true)
+      try {
+        const res = await authApi.login(email.trim(), password, 'student', remember)
+        if (res.access_token && res.user) {
+          completeSessionLogin(res.access_token, res.user, remember)
+        } else {
+          setErrorMessage('Login failed. Please check your credentials.')
+        }
+      } catch (err: any) {
+        const errorText = err.response?.data?.message || err.response?.data?.error || err.message
+        if (errorText?.includes('Please use your official institutional email')) {
+          setErrorMessage('Please use your official institutional email.')
+        } else if (err.code === 'ERR_NETWORK' || errorText?.includes('Network Error')) {
+          // Resilient offline fallback for Student Demo
+          if (email.trim().toLowerCase() === 'student@lokshiksha.in' && (password === 'student@2026' || password === 'demo123')) {
+            toast('Connected via resilient offline student profile', 'info')
+            completeSessionLogin('demo_student_token', {
+              id: 'usr_student_01',
+              name: 'Student Learner',
+              email: 'student@lokshiksha.in',
+              role: 'student',
+              preferredLanguage: 'Santhali'
+            }, remember)
+          } else {
+            setErrorMessage('Unable to reach backend server (http://localhost:8000). Ensure the backend is running with "npm run dev".')
+          }
+        } else {
+          setErrorMessage(errorText || 'Authentication failed. Please verify credentials.')
+        }
+      } finally {
+        setIsSubmitting(false)
+      }
+      return
+    }
+
+    // TEACHER FLOW (Direct Login - No 2-Step OTP)
+    if (selected === 'teacher') {
+      setIsSubmitting(true)
+      try {
+        const res = await authApi.login(email.trim(), password, 'teacher', remember)
+        if (res.access_token && res.user) {
+          completeSessionLogin(res.access_token, res.user, remember)
+        } else {
+          setErrorMessage('Login failed. Please verify teacher credentials.')
+        }
+      } catch (err: any) {
+        const errorText = err.response?.data?.message || err.response?.data?.error || err.message
+        if (err.code === 'ERR_NETWORK' || errorText?.includes('Network Error')) {
+          if (email.trim().toLowerCase() === 'teacher@lokshiksha.in' || email.trim().toUpperCase() === 'TCH-1001') {
+            toast('Connected via resilient offline teacher profile', 'info')
+            completeSessionLogin('demo_teacher_token', {
+              id: 'usr_teacher_01',
+              name: 'Teacher Demo',
+              teacherId: 'TCH-1001',
+              email: 'teacher@lokshiksha.in',
+              role: 'teacher',
+              preferredLanguage: 'Hindi'
+            }, remember)
+          } else {
+            setErrorMessage('Unable to reach backend server. Please check your connection.')
+          }
+        } else {
+          setErrorMessage(errorText || 'Invalid teacher credentials.')
+        }
+      } finally {
+        setIsSubmitting(false)
+      }
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    const resolvedName = fullName.trim() || (email ? email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : (selected === 'teacher' ? 'Classroom Teacher' : 'Student'))
-    void signIn(selected, resolvedName, email)
-  }
-
   const DynamicCardIcon = loginInfo.PrimaryIcon
-  const DynamicEmailIcon = loginInfo.EmailIcon
   const DynamicPasswordIcon = loginInfo.PasswordIcon
 
   return (
     <main className="auth-pro-wrapper">
+      {/* ================= LEFT PANEL: BRANDING ================= */}
       <section className="auth-pro-hero">
         <div className="auth-hero-top">
           <div className="auth-mission-pill">
@@ -634,7 +851,7 @@ function Auth() {
             Bridging regional classroom boundaries across Jharkhand with instant multilingual speech and lesson translation for teachers and tribal learners.
           </p>
 
-          {/* Interactive Live Classroom Translation Card */}
+          {/* Classroom UI Mockup Placeholder */}
           <div className="live-showcase-card">
             <div className="live-showcase-header">
               <div className="live-showcase-status">
@@ -652,7 +869,7 @@ function Auth() {
 
             <div className="source-bubble">
               <div className="source-header">
-                <span>👩🏾‍🏫 Teacher Live Speech (Hindi Source)</span>
+                <span>👩🏾‍🏫 Teacher Live Speech ({teacherSourceLanguage || 'Hindi'} Source)</span>
                 <span className="text-[10px] text-slate-400">00:14 / Realtime</span>
               </div>
               <p className="source-text">
@@ -690,6 +907,7 @@ function Auth() {
           </div>
         </div>
 
+        {/* Bottom Feature Text */}
         <div className="auth-hero-footer">
           <div className="stat-item">
             <strong>4 Languages</strong>
@@ -706,6 +924,7 @@ function Auth() {
         </div>
       </section>
 
+      {/* ================= RIGHT PANEL: INTERACTIVE ================= */}
       <section className="auth-pro-card-panel">
         <div className="auth-pro-card">
           <div className="auth-mobile-header">
@@ -730,7 +949,31 @@ function Auth() {
             </div>
           </div>
 
-          {/* DYNAMIC IDENTITY BADGE & ICON */}
+          {/* Prominent Toggle Tabs at the Top */}
+          <div className="auth-role-tabs-pro" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={selected === 'teacher'}
+              className={`auth-role-tab-btn ${selected === 'teacher' ? 'active' : ''}`}
+              onClick={() => handleSwitchTab('teacher')}
+            >
+              <GraduationCap size={16} />
+              <span>Teacher / शिक्षक</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={selected === 'student'}
+              className={`auth-role-tab-btn ${selected === 'student' ? 'active' : ''}`}
+              onClick={() => handleSwitchTab('student')}
+            >
+              <Sparkles size={16} />
+              <span>Student / विद्यार्थी</span>
+            </button>
+          </div>
+
+          {/* Dynamic Identity Badge */}
           <div className={`dynamic-login-identity ${loginInfo.identityClass}`}>
             <div className={`dynamic-login-icon-box ${loginInfo.iconBoxClass}`}>
               <DynamicCardIcon size={22} />
@@ -748,50 +991,29 @@ function Auth() {
             </div>
           </div>
 
+          {/* Error Alert Display */}
+          {errorMessage && (
+            <div className="auth-alert-error" role="alert">
+              <AlertCircle size={16} className="shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
+          {/* Credential Form */}
           <div className="auth-card-header">
-            <h2>Sign in to Workspace</h2>
-            <p>Select your learning profile to access your synchronized classroom.</p>
+            <h2>{selected === 'teacher' ? 'Teacher Portal' : 'Student Desk'}</h2>
+            <p>
+              {selected === 'teacher'
+                ? 'Sign in with your Teacher Email or ID to access your synchronized classroom.'
+                : 'Sign in directly with your official institutional @lokshiksha.in email.'}
+            </p>
           </div>
 
-          <span className="role-picker-label">Select Workspace Role</span>
-          <div className="role-cards-grid">
-            <button
-              type="button"
-              id="role-teacher-btn"
-              className={`role-card-pro ${selected === 'teacher' ? 'active' : ''}`}
-              onClick={() => handleFillDemo('teacher')}
-            >
-              <div className="role-badge-check">
-                <Check size={11} strokeWidth={3} />
-              </div>
-              <div className="role-icon-box">
-                <GraduationCap size={18} />
-              </div>
-              <strong className="role-title">Teacher / शिक्षक</strong>
-              <span className="role-desc">Upload lessons, live speech & class analytics</span>
-            </button>
-
-            <button
-              type="button"
-              id="role-student-btn"
-              className={`role-card-pro ${selected === 'student' ? 'active' : ''}`}
-              onClick={() => handleFillDemo('student')}
-            >
-              <div className="role-badge-check">
-                <Check size={11} strokeWidth={3} />
-              </div>
-              <div className="role-icon-box">
-                <Sparkles size={17} />
-              </div>
-              <strong className="role-title">Student / विद्यार्थी</strong>
-              <span className="role-desc">Translated audio lessons & mother tongue desk</span>
-            </button>
-          </div>
-
+          {/* Quick Demo Preset Bar */}
           <div className="quick-demo-container">
             <div className="quick-demo-title">
-              <span>⚡ One-Click Evaluation Presets</span>
-              <span className="text-indigo-600 font-semibold">Click to autofill</span>
+              <span>⚡ Quick Evaluation Presets</span>
+              <span className="text-purple-600 font-semibold">Click to autofill</span>
             </div>
             <div className="quick-demo-buttons">
               <button
@@ -814,54 +1036,37 @@ function Auth() {
           </div>
 
           <form className="auth-form-pro" onSubmit={handleSubmit}>
+            {/* Email / ID Input (NO Full Name field) */}
             <div className="input-field-group">
               <div className="input-label-row">
-                <label htmlFor="auth-fullname">Full Name / पूरा नाम</label>
-                {fullName.trim() && (
-                  <span className="input-verified-tag">
-                    <CheckCircle2 size={12} /> Name entered
-                  </span>
-                )}
-              </div>
-              <div className="input-with-icon">
-                <span className="input-icon-left dynamic-icon active-icon text-indigo-500">
-                  <UserCheck size={17} />
-                </span>
-                <input
-                  id="auth-fullname"
-                  required
-                  type="text"
-                  value={fullName}
-                  onChange={e => setFullName(e.target.value)}
-                  placeholder={selected === 'teacher' ? 'e.g. Dr. Rajesh Sharma' : 'e.g. Anita Soren'}
-                />
-              </div>
-            </div>
-
-            <div className="input-field-group">
-              <div className="input-label-row">
-                <label htmlFor="auth-email">Institutional Email</label>
+                <label htmlFor="auth-email">
+                  {selected === 'teacher' ? 'Teacher Email / ID' : 'Institutional Email'}
+                </label>
                 {loginInfo.isEmailValid && (
                   <span className="input-verified-tag">
-                    <CheckCircle2 size={12} /> Valid email
+                    <CheckCircle2 size={12} /> Format valid
                   </span>
                 )}
               </div>
               <div className="input-with-icon">
                 <span className={`input-icon-left dynamic-icon active-icon ${loginInfo.emailColor}`}>
-                  <DynamicEmailIcon size={17} />
+                  {selected === 'teacher' ? <GraduationCap size={17} /> : <Mail size={17} />}
                 </span>
                 <input
                   id="auth-email"
                   required
-                  type="email"
+                  type={selected === 'teacher' ? 'text' : 'email'}
                   value={email}
-                  onChange={e => handleEmailChange(e.target.value)}
-                  placeholder={selected === 'teacher' ? 'teacher@lokshiksha.in' : 'student@lokshiksha.in'}
+                  onChange={e => {
+                    setEmail(e.target.value)
+                    setErrorMessage(null)
+                  }}
+                  placeholder={selected === 'teacher' ? 'teacher@lokshiksha.in or TCH-1001' : 'student@lokshiksha.in'}
                 />
               </div>
             </div>
 
+            {/* Password Input */}
             <div className="input-field-group">
               <div className="input-label-row">
                 <label htmlFor="auth-password">Account Password</label>
@@ -876,7 +1081,10 @@ function Auth() {
                   minLength={6}
                   type={showPassword ? 'text' : 'password'}
                   value={password}
-                  onChange={e => setPassword(e.target.value)}
+                  onChange={e => {
+                    setPassword(e.target.value)
+                    setErrorMessage(null)
+                  }}
                   placeholder="Enter security password"
                 />
                 <button
@@ -894,6 +1102,7 @@ function Auth() {
               </div>
             </div>
 
+            {/* Remember Me Checkbox */}
             <div className="form-meta-row">
               <label className="remember-checkbox">
                 <input
@@ -905,38 +1114,24 @@ function Auth() {
               </label>
             </div>
 
-            <button type="submit" id="submit-login-btn" className="primary-cta-pro">
+            {/* Solid Purple Submit Button */}
+            <button
+              type="submit"
+              id="submit-login-btn"
+              className="primary-cta-pro"
+              disabled={isSubmitting || !email.trim() || password.length < 6}
+            >
               <DynamicCardIcon size={18} />
-              <span>Enter {selected === 'teacher' ? 'Teacher Dashboard' : 'Student Desk'}</span>
+              <span>
+                {isSubmitting
+                  ? 'Signing In...'
+                  : selected === 'teacher'
+                  ? 'Enter Teacher Dashboard'
+                  : 'Enter Student Desk'}
+              </span>
               <ArrowRight size={17} />
             </button>
           </form>
-
-          <div className="pro-auth-divider">
-            <span>or federated access</span>
-          </div>
-
-          <a className="google-sso-btn" href={googleLoginUrl} id="google-sso-link">
-            <svg className="google-icon-svg" viewBox="0 0 24 24">
-              <path
-                fill="#4285F4"
-                d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
-              />
-              <path
-                fill="#EA4335"
-                d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
-              />
-            </svg>
-            <span>Continue with Google Workspace</span>
-          </a>
 
           <div className="auth-security-notice">
             <Shield size={13} className="text-slate-400" />
@@ -947,3 +1142,4 @@ function Auth() {
     </main>
   )
 }
+

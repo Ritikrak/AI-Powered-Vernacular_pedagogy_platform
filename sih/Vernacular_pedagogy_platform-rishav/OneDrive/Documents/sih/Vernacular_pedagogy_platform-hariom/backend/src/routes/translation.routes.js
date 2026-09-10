@@ -5,6 +5,7 @@ import { upload } from '../middleware/upload.js';
 const router = express.Router();
 
 // Translation endpoints
+router.get('/common-words', translationController.getCommonWords);
 router.post('/', translationController.translateSingle);
 router.post('/all', translationController.translateAll);
 router.post('/speech', translationController.translateSpeech);

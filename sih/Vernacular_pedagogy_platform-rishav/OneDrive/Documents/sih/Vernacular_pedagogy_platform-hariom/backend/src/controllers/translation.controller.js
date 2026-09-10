@@ -1,24 +1,48 @@
 import { translationService } from '../services/translation.service.js';
 import { sttService } from '../services/stt.service.js';
 import { ttsService } from '../services/tts.service.js';
+import { COMMON_WORDS } from '../data/commonWords.js';
 import { ApiError } from '../middleware/errorHandler.js';
 
 export const translationController = {
+  /**
+   * Get pre-stored vernacular common words vocabulary (25+ words)
+   */
+  async getCommonWords(req, res, next) {
+    try {
+      res.status(200).json({
+        total: COMMON_WORDS.length,
+        languages: ['Santhali', 'Mundari', 'Ho', 'Kurukh', 'English'],
+        words: COMMON_WORDS
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
   /**
    * Translate a single piece of text to target language
    */
   async translateSingle(req, res, next) {
     try {
-      const { text, target_language = 'Santhali', source_language = 'Hindi' } = req.body;
+      const { text, target_language, source_language, targetLanguage, sourceLanguage } = req.body;
       if (!text) {
         throw new ApiError(400, 'text is required');
       }
 
-      const result = await translationService.translate(text, target_language, source_language);
+      const target = targetLanguage || target_language || 'Santhali';
+      const source = sourceLanguage || source_language || 'Hindi';
+
+      const result = await translationService.translate(text, target, source);
       res.status(200).json({
+        translatedText: result.translatedText,
         translated_text: result.translatedText,
+        sourceLanguage: source,
+        source_language: source,
+        targetLanguage: target,
+        target_language: target,
+        phoneticText: result.phoneticText,
         phonetic_text: result.phoneticText,
-        target_language: result.targetLanguage,
         provider: result.provider
       });
     } catch (error) {
@@ -54,7 +78,7 @@ export const translationController = {
       }
 
       const translation = await translationService.translate(text, target_language, source_language);
-      const audioSynthesis = await ttsService.synthesize(translation.translatedText, target_language);
+      const audioSynthesis = await ttsService.synthesize(translation.translatedText, target_language, translation.phoneticText);
 
       res.status(200).json({
         translated_text: translation.translatedText,

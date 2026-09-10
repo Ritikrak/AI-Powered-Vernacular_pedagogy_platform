@@ -10,6 +10,7 @@ import {
   Languages,
   Plus,
   Radio,
+  Search,
   Sparkles,
   Trash2,
   TrendingUp,
@@ -28,29 +29,55 @@ export function StudentsModal({ onClose }: ModalProps) {
   const { students, addStudent, deleteStudent } = useApp()
   const [showAddForm, setShowAddForm] = useState(false)
   const [studentToDelete, setStudentToDelete] = useState<StudentItem | null>(null)
+  const [recentAddedId, setRecentAddedId] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filterClass, setFilterClass] = useState('All')
 
   // Form states
   const [name, setName] = useState('')
   const [preferredLanguage, setPreferredLanguage] = useState('Santhali')
-  const [gradeLevel, setGradeLevel] = useState('Class 5')
+  const [gradeLevel, setGradeLevel] = useState('Class 1')
   const [section, setSection] = useState('A')
   const [rollNumber, setRollNumber] = useState('')
+  const [formSuccessMessage, setFormSuccessMessage] = useState('')
 
-  const handleAddSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleEnroll = (keepFormOpen: boolean = false) => {
     if (!name.trim()) return
-    addStudent({
+    const newRoll = rollNumber.trim() || String(students.length + 1).padStart(2, '0')
+    const added = addStudent({
       name: name.trim(),
       preferredLanguage,
       gradeLevel,
       section,
-      rollNumber: rollNumber.trim() || `0${students.length + 1}`,
+      rollNumber: newRoll,
       score: Math.floor(Math.random() * 7 + 92),
       attendanceStatus: 'active'
     })
+
+    // Highlight newly added student
+    setRecentAddedId(added.id)
+    setTimeout(() => setRecentAddedId(null), 4000)
+
+    setFormSuccessMessage(`"${added.name}" added to ${added.gradeLevel}!`)
+    setTimeout(() => setFormSuccessMessage(''), 3000)
+
     setName('')
-    setRollNumber('')
-    setShowAddForm(false)
+    // Suggest next roll number
+    const parsedRoll = parseInt(newRoll, 10)
+    if (!isNaN(parsedRoll)) {
+      setRollNumber(String(parsedRoll + 1).padStart(2, '0'))
+    } else {
+      setRollNumber('')
+    }
+
+    if (!keepFormOpen) {
+      setShowAddForm(false)
+    }
+  }
+
+  const handleAddSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    handleEnroll(false)
   }
 
   const handleConfirmDelete = () => {
@@ -59,6 +86,16 @@ export function StudentsModal({ onClose }: ModalProps) {
       setStudentToDelete(null)
     }
   }
+
+  const filteredStudents = students.filter(student => {
+    const matchesSearch =
+      student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      student.preferredLanguage.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (student.rollNumber && student.rollNumber.includes(searchQuery)) ||
+      (student.gradeLevel && student.gradeLevel.toLowerCase().includes(searchQuery.toLowerCase()))
+    const matchesClass = filterClass === 'All' || student.gradeLevel === filterClass
+    return matchesSearch && matchesClass
+  })
 
   return (
     <div className="dashboard-modal-backdrop" onClick={onClose}>
@@ -74,7 +111,7 @@ export function StudentsModal({ onClose }: ModalProps) {
                 Connected Students & Classroom Roster
               </strong>
               <span className="text-xs text-slate-500">
-                {students.length} active students enrolled • Updates Connected Students count live
+                {students.length} active students enrolled across Class 1 to 8 • Synchronized live with Dashboard
               </span>
             </div>
           </div>
@@ -93,7 +130,7 @@ export function StudentsModal({ onClose }: ModalProps) {
             <div className="flex items-center gap-3">
               <AlertTriangle size={18} className="text-amber-600 flex-shrink-0" />
               <span className="text-xs font-semibold text-amber-900">
-                Remove <strong>{studentToDelete.name}</strong> from classroom roster?
+                Remove <strong>{studentToDelete.name}</strong> ({studentToDelete.gradeLevel}) from classroom roster?
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -117,32 +154,44 @@ export function StudentsModal({ onClose }: ModalProps) {
 
         {/* Body */}
         <div className="modal-body space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-              Enrolled Students ({students.length})
-            </span>
+          {/* Top Bar: Title + Add Student Button */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Student Roster ({students.length})
+              </span>
+              {formSuccessMessage && (
+                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-md animate-fadeInModal">
+                  ✓ {formSuccessMessage}
+                </span>
+              )}
+            </div>
             <button
               type="button"
               onClick={() => setShowAddForm(!showAddForm)}
-              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
+              className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
             >
-              <Plus size={14} /> {showAddForm ? 'Close Form' : 'Add Student'}
+              <Plus size={14} /> {showAddForm ? 'Hide Form' : '+ Enroll Student'}
             </button>
           </div>
 
           {/* Add Student Form */}
           {showAddForm && (
             <form onSubmit={handleAddSubmit} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3 animate-fadeInModal">
-              <strong className="text-xs font-bold text-slate-800 block">Enroll New Student</strong>
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                <strong className="text-xs font-bold text-slate-800 block">Enroll Student (Classes 1 to 8)</strong>
+                <span className="text-[11px] text-slate-500 font-medium">Add as many students as needed</span>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[11px] font-bold text-slate-600 block mb-1">Full Name / नाम</label>
+                  <label className="text-[11px] font-bold text-slate-600 block mb-1">Student Full Name *</label>
                   <input
                     required
                     type="text"
-                    placeholder="e.g. Pooja Besra"
+                    placeholder="e.g. Ramesh Hansda"
                     value={name}
                     onChange={e => setName(e.target.value)}
+                    autoFocus
                     className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
@@ -161,20 +210,24 @@ export function StudentsModal({ onClose }: ModalProps) {
                   </select>
                 </div>
                 <div>
-                  <label className="text-[11px] font-bold text-slate-600 block mb-1">Grade Level</label>
+                  <label className="text-[11px] font-bold text-slate-600 block mb-1">Grade Level (Class 1 to 8)</label>
                   <select
                     value={gradeLevel}
                     onChange={e => setGradeLevel(e.target.value)}
                     className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
+                    <option value="Class 1">Class 1</option>
+                    <option value="Class 2">Class 2</option>
+                    <option value="Class 3">Class 3</option>
                     <option value="Class 4">Class 4</option>
                     <option value="Class 5">Class 5</option>
                     <option value="Class 6">Class 6</option>
                     <option value="Class 7">Class 7</option>
+                    <option value="Class 8">Class 8</option>
                   </select>
                 </div>
                 <div>
-                  <label className="text-[11px] font-bold text-slate-600 block mb-1">Section & Roll</label>
+                  <label className="text-[11px] font-bold text-slate-600 block mb-1">Section & Roll No</label>
                   <div className="flex gap-2">
                     <select
                       value={section}
@@ -184,6 +237,7 @@ export function StudentsModal({ onClose }: ModalProps) {
                       <option value="A">Sec A</option>
                       <option value="B">Sec B</option>
                       <option value="C">Sec C</option>
+                      <option value="D">Sec D</option>
                     </select>
                     <input
                       type="text"
@@ -195,72 +249,146 @@ export function StudentsModal({ onClose }: ModalProps) {
                   </div>
                 </div>
               </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAddForm(false)}
-                  className="px-3.5 py-1.5 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-bold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-1.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 shadow-sm"
-                >
-                  Enroll Student
-                </button>
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200">
+                <span className="text-[10px] text-slate-400">
+                  Tip: Click &quot;Enroll &amp; Add Another&quot; to quickly add multiple students without reopening the form.
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddForm(false)}
+                    className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleEnroll(true)}
+                    className="px-3.5 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-xl text-xs font-bold hover:bg-indigo-100 transition-colors flex items-center gap-1"
+                  >
+                    <Plus size={13} /> Enroll &amp; Add Another
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-1.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 shadow-sm"
+                  >
+                    Enroll Student
+                  </button>
+                </div>
               </div>
             </form>
           )}
 
+          {/* Search & Class Filter Bar */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
+            <div className="relative flex-1">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search enrolled students by name, roll, or language..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <select
+              value={filterClass}
+              onChange={e => setFilterClass(e.target.value)}
+              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="All">All Classes (1 to 8)</option>
+              <option value="Class 1">Class 1</option>
+              <option value="Class 2">Class 2</option>
+              <option value="Class 3">Class 3</option>
+              <option value="Class 4">Class 4</option>
+              <option value="Class 5">Class 5</option>
+              <option value="Class 6">Class 6</option>
+              <option value="Class 7">Class 7</option>
+              <option value="Class 8">Class 8</option>
+            </select>
+          </div>
+
           {/* Students List */}
-          <div className="divide-y divide-slate-100 border border-slate-200 rounded-2xl overflow-hidden bg-white max-h-80 overflow-y-auto">
+          <div className="divide-y divide-slate-100 border border-slate-200 rounded-2xl overflow-hidden bg-white max-h-96 overflow-y-auto">
             {students.length === 0 ? (
               <div className="p-8 text-center text-slate-400 text-xs">
-                No students enrolled yet. Click &quot;Add Student&quot; above to add your first student.
+                No students enrolled yet. Click &quot;+ Enroll Student&quot; above to add your first student.
+              </div>
+            ) : filteredStudents.length === 0 ? (
+              <div className="p-8 text-center text-slate-400 text-xs">
+                No students match &quot;{searchQuery || filterClass}&quot;.
               </div>
             ) : (
-              students.map(student => (
-                <div key={student.id} className="p-3 sm:px-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 font-bold text-xs flex items-center justify-center flex-shrink-0">
-                      {student.name.slice(0, 2).toUpperCase()}
+              filteredStudents.map(student => {
+                const isRecent = student.id === recentAddedId
+                return (
+                  <div
+                    key={student.id}
+                    className={`p-3 sm:px-4 flex items-center justify-between transition-colors ${
+                      isRecent ? 'bg-emerald-50/90 border-l-4 border-emerald-500' : 'hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-full font-bold text-xs flex items-center justify-center flex-shrink-0 ${
+                        isRecent ? 'bg-emerald-200 text-emerald-800' : 'bg-purple-100 text-purple-700'
+                      }`}>
+                        {student.name.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <strong className="text-xs text-slate-900 font-bold">{student.name}</strong>
+                          {isRecent && (
+                            <span className="px-1.5 py-0.2 bg-emerald-500 text-white rounded text-[9px] font-extrabold uppercase tracking-wider animate-pulse">
+                              Just Added
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-slate-400">
+                          {student.gradeLevel || 'Class 1'} • Sec {student.section || 'A'} • Roll {student.rollNumber || '01'}
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <strong className="text-xs text-slate-900 block font-bold">{student.name}</strong>
-                      <span className="text-[10px] text-slate-400">
-                        {student.gradeLevel || 'Class 5'} • Sec {student.section || 'A'} • Roll {student.rollNumber || '01'}
-                      </span>
-                    </div>
-                  </div>
 
-                  <div className="flex items-center gap-3">
-                    <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-md text-[10px] font-bold font-mono">
-                      {student.preferredLanguage}
-                    </span>
-                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md hidden sm:inline">
-                      {student.score || 94}% Gain
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setStudentToDelete(student)}
-                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title={`Remove ${student.name}`}
-                    >
-                      <Trash2 size={15} />
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-md text-[10px] font-bold font-mono">
+                        {student.preferredLanguage}
+                      </span>
+                      <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md hidden sm:inline">
+                        {student.score || 94}% Gain
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setStudentToDelete(student)}
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title={`Remove ${student.name}`}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))
+                )
+              })
             )}
           </div>
         </div>
 
         {/* Footer */}
         <div className="modal-footer">
-          <span className="text-xs text-slate-500">
-            Total Enrolled: <strong className="text-slate-900 font-bold">{students.length}</strong>
-          </span>
+          <div className="flex items-center gap-3 text-xs text-slate-500">
+            <span>
+              Total Enrolled: <strong className="text-slate-900 font-bold">{students.length}</strong>
+            </span>
+            {filterClass !== 'All' && (
+              <span className="hidden sm:inline">
+                ({filterClass}: <strong className="text-indigo-600 font-bold">{students.filter(s => s.gradeLevel === filterClass).length}</strong>)
+              </span>
+            )}
+            {searchQuery && (
+              <span className="text-slate-400">
+                (Filtered: {filteredStudents.length})
+              </span>
+            )}
+          </div>
           <button
             type="button"
             onClick={onClose}

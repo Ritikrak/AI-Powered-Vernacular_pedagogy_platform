@@ -11,6 +11,7 @@ import apiRouter from './routes/index.js';
 import { errorHandler, ApiError } from './middleware/errorHandler.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
 import { setupClassroomSockets } from './sockets/classroom.socket.js';
+import { setupDeepgramWebSocket } from './sockets/deepgram.socket.js';
 
 // Initialize Express Application
 const app = express();
@@ -55,11 +56,24 @@ app.get('/', (req, res) => {
   });
 });
 
+// Google OAuth root-level aliases (in case Google Console was set without /api prefix)
+app.get('/auth/google', (req, res) => {
+  const query = new URLSearchParams(req.query).toString();
+  res.redirect(`/api/auth/google${query ? `?${query}` : ''}`);
+});
+app.get('/auth/google/callback', (req, res) => {
+  const query = new URLSearchParams(req.query).toString();
+  res.redirect(`/api/auth/google/callback${query ? `?${query}` : ''}`);
+});
+
 // Mount Main API Routes
 app.use('/api', apiRouter);
 
 // Setup Socket.IO Classroom Handlers
 setupClassroomSockets(io);
+
+// Setup Deepgram Realtime Audio Streaming WebSocket at /api/classroom/:roomId/deepgram
+setupDeepgramWebSocket(server, io);
 
 // 404 Handler for Unknown Routes
 app.use((req, res, next) => {
@@ -73,6 +87,16 @@ app.use(errorHandler);
 async function startServer() {
   await connectDB();
 
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`\n❌ [SERVER ERROR] Port ${env.port} is already in use by another process.`);
+      console.error(`💡 Tip: Stop any existing running server on port ${env.port} or change PORT in backend/.env\n`);
+    } else {
+      console.error(`\n❌ [SERVER ERROR]:`, err.message || err);
+    }
+    process.exit(1);
+  });
+
   server.listen(env.port, () => {
     console.log(`
 ===================================================================
@@ -81,6 +105,7 @@ async function startServer() {
 📡 HTTP Server:     http://localhost:${env.port}
 🩺 Health Check:    http://localhost:${env.port}/api/health
 🔌 Socket.IO:       ws://localhost:${env.port}/classroom
+🎙️ Deepgram WS:     ws://localhost:${env.port}/api/classroom/:roomId/deepgram
 🌍 Supported Dialects: Santhali, Mundari, Ho, Kurukh, Hindi, English
 🤖 AI Engine:       Google Gemini 2.5 Flash + Vernacular Fallback
 ===================================================================
@@ -100,6 +125,7 @@ process.on('SIGTERM', () => {
 process.on('SIGINT', () => {
   console.log('🛑 [SERVER] SIGINT received. Shutting down...');
   server.close(() => {
+    console.log('💤 [SERVER] Process interrupted. Exit.');
     process.exit(0);
   });
 });

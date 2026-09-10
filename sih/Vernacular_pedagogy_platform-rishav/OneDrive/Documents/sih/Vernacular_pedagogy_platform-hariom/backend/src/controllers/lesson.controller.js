@@ -2,8 +2,10 @@ import pdfParse from 'pdf-parse';
 import { isMongoConnected } from '../config/db.js';
 import { Lesson, mockLessons } from '../models/Lesson.js';
 import { Translation } from '../models/Translation.js';
+import { Progress, progressStore } from '../models/Progress.js';
 import { geminiService } from '../services/gemini.service.js';
 import { translationService } from '../services/translation.service.js';
+import { ttsService } from '../services/tts.service.js';
 import { ApiError } from '../middleware/errorHandler.js';
 
 export const lessonController = {
@@ -24,16 +26,25 @@ export const lessonController = {
         }
       }
 
-      // Map to frontend expected shape: { id, title, source_text, source_language, translations }
-      const formatted = lessons.map(item => ({
-        id: item.id || item._id,
+      // Map to consistent structure supporting both frontend and user schema specifications
+      const formatted = lessons.map((item, idx) => ({
+        id: item.id || `lesson-${idx + 101}`,
         _id: item._id,
+        rawId: item.rawId || item._id,
         title: item.title,
         subject: item.subject,
-        grade_level: item.gradeLevel,
+        class: item.class || 5,
+        gradeLevel: item.gradeLevel || 'Class 5',
+        grade_level: item.gradeLevel || 'Class 5',
+        description: item.description || (item.simplifiedText ? item.simplifiedText.slice(0, 120) + '...' : `Curriculum chapter on ${item.title}`),
+        availableLanguages: item.availableLanguages || ['English', 'Hindi', 'Santhali', 'Mundari', 'Ho', 'Kurukh'],
+        audioAvailable: item.audioAvailable !== false,
         source_text: item.sourceText,
+        sourceText: item.sourceText,
         source_language: item.sourceLanguage || 'Hindi',
+        sourceLanguage: item.sourceLanguage || 'Hindi',
         simplified_text: item.simplifiedText || '',
+        simplifiedText: item.simplifiedText || '',
         translations: item.translations || []
       }));
 
@@ -130,22 +141,130 @@ export const lessonController = {
   async getLessonById(req, res, next) {
     try {
       const { id } = req.params;
-      let lesson;
-      try {
-        lesson = await Lesson.findById(id).populate('translations');
-      } catch {
-        lesson = mockLessons.find(l => l.id == id || l._id === id);
+      let lesson = mockLessons.find(
+        l => String(l.id).toLowerCase() === String(id).toLowerCase() ||
+             String(l._id).toLowerCase() === String(id).toLowerCase() ||
+             String(l.rawId).toLowerCase() === String(id).toLowerCase() ||
+             (l.id && String(l.id).replace('lesson-', '') === String(id))
+      );
+
+      if (!lesson && isMongoConnected()) {
+        try {
+          lesson = await Lesson.findById(id).populate('translations');
+        } catch {
+          // Fall back to mockLessons
+        }
       }
 
       if (!lesson) {
-        lesson = mockLessons.find(l => l.id == id || l._id === id);
+        throw new ApiError(404, `Lesson with ID '${id}' not found`);
+      }
+
+      res.status(200).json({
+        id: lesson.id || lesson._id,
+        _id: lesson._id,
+        rawId: lesson.rawId || lesson._id,
+        title: lesson.title,
+        subject: lesson.subject,
+        class: lesson.class || 5,
+        gradeLevel: lesson.gradeLevel || 'Class 5',
+        grade_level: lesson.gradeLevel || 'Class 5',
+        description: lesson.description || (lesson.simplifiedText ? lesson.simplifiedText.slice(0, 120) + '...' : `Curriculum chapter on ${lesson.title}`),
+        availableLanguages: lesson.availableLanguages || ['English', 'Hindi', 'Santhali', 'Mundari', 'Ho', 'Kurukh'],
+        audioAvailable: lesson.audioAvailable !== false,
+        source_text: lesson.sourceText,
+        sourceText: lesson.sourceText,
+        source_language: lesson.sourceLanguage || 'Hindi',
+        sourceLanguage: lesson.sourceLanguage || 'Hindi',
+        simplified_text: lesson.simplifiedText || '',
+        simplifiedText: lesson.simplifiedText || '',
+        translations: lesson.translations || []
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Mark a lesson as completed: POST /api/lessons/:id/complete
+   */
+  async completeLesson(req, res, next) {
+    try {
+      const { id } = req.params;
+      const studentId = req.user?.id || req.body.studentId || 'student-demo';
+
+      let lesson = mockLessons.find(
+        l => String(l.id).toLowerCase() === String(id).toLowerCase() ||
+             String(l._id).toLowerCase() === String(id).toLowerCase() ||
+             String(l.rawId).toLowerCase() === String(id).toLowerCase()
+      );
+      if (!lesson && isMongoConnected()) {
+        try {
+          lesson = await Lesson.findById(id);
+        } catch {}
+      }
+      const targetId = lesson ? (lesson.id || lesson._id) : id;
+
+      const record = progressStore.recordProgress(studentId, targetId, 100);
+      const summary = progressStore.getSummary(studentId);
+
+      res.status(200).json({
+        success: true,
+        message: 'Lesson marked as completed',
+        lessonId: targetId,
+        status: 'completed',
+        record,
+        summary
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Get audio streams for all languages for a lesson: GET /api/lessons/:id/audio
+   */
+  async getLessonAudio(req, res, next) {
+    try {
+      const { id } = req.params;
+      let lesson = mockLessons.find(
+        l => String(l.id).toLowerCase() === String(id).toLowerCase() ||
+             String(l._id).toLowerCase() === String(id).toLowerCase() ||
+             String(l.rawId).toLowerCase() === String(id).toLowerCase()
+      );
+
+      if (!lesson && isMongoConnected()) {
+        try {
+          lesson = await Lesson.findById(id).populate('translations');
+        } catch {}
       }
 
       if (!lesson) {
-        throw new ApiError(404, 'Lesson not found');
+        throw new ApiError(404, `Lesson '${id}' not found`);
       }
 
-      res.status(200).json(lesson);
+      const languages = ['English', 'Hindi', 'Santhali', 'Mundari', 'Ho', 'Kurukh'];
+      const audio = {};
+
+      for (const lang of languages) {
+        let textForAudio = lesson.title;
+        if (lang === 'Hindi') {
+          textForAudio = (lesson.simplifiedText || lesson.sourceText || lesson.title).slice(0, 200);
+        } else {
+          const tr = lesson.translations?.find(t => t.language?.toLowerCase() === lang.toLowerCase());
+          textForAudio = tr
+            ? (tr.phonetic_text || tr.translated_text || lesson.title).slice(0, 200)
+            : (lesson.simplifiedText || lesson.title).slice(0, 200);
+        }
+        const synth = await ttsService.synthesize(textForAudio, lang);
+        audio[lang] = synth.audioUrl;
+      }
+
+      res.status(200).json({
+        lessonId: lesson.id,
+        title: lesson.title,
+        audio
+      });
     } catch (error) {
       next(error);
     }
