@@ -1,0 +1,11 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root { --background: 41 43% 95%; --foreground: 148 17% 15%; --card: 43 50% 99%; --card-foreground: 148 17% 15%; --primary: 151 38% 31%; --primary-foreground: 42 43% 97%; --secondary: 38 29% 90%; --secondary-foreground: 148 17% 15%; --muted: 42 17% 91%; --muted-foreground: 143 7% 47%; --accent: 38 31% 87%; --accent-foreground: 148 17% 15%; --border: 39 23% 84%; --input: 39 23% 84%; --ring: 151 38% 31%; --radius: .5rem; }
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground; font-family: 'Manrope', sans-serif; background-image: radial-gradient(circle at 88% 0%, rgba(255,248,225,.9), transparent 32%), linear-gradient(135deg, rgba(255,255,255,.3), transparent 40%); }
+}
+@layer utilities { .font-display { font-family: 'Space Grotesk', sans-serif; } .font-mono-ui { font-family: 'DM Mono', monospace; } .text-coral { color: #bf5a3d; } .text-sage { color: #4f8065; } .bg-coral\/12 { background-color: rgba(191,90,61,.12); } .bg-sage\/15 { background-color: rgba(79,128,101,.15); } }

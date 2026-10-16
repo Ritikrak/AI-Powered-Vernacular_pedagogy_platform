@@ -1,0 +1,39 @@
+$kind: http-request
+name: http://localhost:8000/api/auth/register
+description: "Generated from cURL: curl -X POST http://localhost:8000/api/auth/register \\\r
+
+  \  -H \"Content-Type: application/json\" \\\r
+
+  \  -d '{\r
+
+  \    \"name\": \"Rohan Sharma\",\r
+
+  \    \"email\": \"rohan.sharma@example.com\",\r
+
+  \    \"password\": \"Password123\",\r
+
+  \    \"role\": \"student\",\r
+
+  \    \"preferredLanguage\": \"Hindi\"\r
+
+  \  }'\r\n"
+url: http://localhost:8000/api/auth/register
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: "{\r
+
+    \    \"name\": \"Rohan Sharma\",\r
+
+    \    \"email\": \"rohan.sharma@example.com\",\r
+
+    \    \"password\": \"Password123\",\r
+
+    \    \"role\": \"student\",\r
+
+    \    \"preferredLanguage\": \"Hindi\"\r
+
+    \  }"
+order: 1788761829487
