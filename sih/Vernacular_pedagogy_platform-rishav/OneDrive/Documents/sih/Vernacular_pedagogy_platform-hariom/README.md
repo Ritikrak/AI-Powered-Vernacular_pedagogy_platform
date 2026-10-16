@@ -1,6 +1,6 @@
-# LokShiksha - Vernacular Pedagogy Platform
+# 	AI-Powered - Vernacular Pedagogy Platform
 
-LokShiksha is an MVP classroom workflow for teachers who teach in Hindi and students who learn in Santhali, Mundari, Ho, or Kurukh.
+It is an MVP classroom workflow for teachers who teach in Hindi and students who learn in Santhali, Mundari, Ho, or Kurukh.
 
 ## Flow implemented
 
