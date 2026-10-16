@@ -32,11 +32,10 @@ export async function connectDB() {
     isInMemoryFallback = false;
     console.log(`✅ [MONGODB] Connected successfully to: ${conn.connection.host}/${conn.connection.name}`);
   } catch (error) {
-    // If SRV lookup failed or network blocked SRV, try direct Atlas replica set endpoint if on same cluster
-    const directAtlasFallback = 'mongodb://rritik345_db_user:rAoHZBTAJGCK6Fcq@ac-5prbow0-shard-00-00.xnfvhg2.mongodb.net:27017,ac-5prbow0-shard-00-01.xnfvhg2.mongodb.net:27017,ac-5prbow0-shard-00-02.xnfvhg2.mongodb.net:27017/vernacular-pedagogy?ssl=true&replicaSet=atlas-3hyjry-shard-0&authSource=admin&retryWrites=true&w=majority';
-    if (targetUri.includes('vernacular-pedagogy.xnfvhg2.mongodb.net') && !targetUri.includes('ac-5prbow0-shard')) {
+    const directAtlasFallback = env.mongodbDirectFallbackUri;
+    if (directAtlasFallback && directAtlasFallback !== targetUri) {
       try {
-        console.log('🔄 [MONGODB] Retrying via direct Atlas replica set endpoint...');
+        console.log('🔄 [MONGODB] Retrying with configured direct fallback URI...');
         const conn = await mongoose.connect(directAtlasFallback, {
           serverSelectionTimeoutMS: 5000,
           connectTimeoutMS: 10000,

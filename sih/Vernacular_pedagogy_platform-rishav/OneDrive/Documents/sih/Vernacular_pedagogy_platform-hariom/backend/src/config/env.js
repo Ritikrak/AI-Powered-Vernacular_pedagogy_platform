@@ -13,6 +13,7 @@ export const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   isProduction: process.env.NODE_ENV === 'production',
   mongodbUri: process.env.MONGODB_URI || 'mongodb://localhost:27017/vernacular_classroom',
+  mongodbDirectFallbackUri: process.env.MONGODB_DIRECT_FALLBACK_URI || '',
   jwtSecret: process.env.JWT_SECRET || process.env.JWT_ACCESS_SECRET || 'lokshiksha_vernacular_pedagogy_secure_jwt_secret_2026',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   googleClientId: process.env.GOOGLE_CLIENT_ID || '678831874585-demo.apps.googleusercontent.com',

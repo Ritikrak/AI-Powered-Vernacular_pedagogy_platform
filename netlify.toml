@@ -1,0 +1,9 @@
+[build]
+  base = "sih/Vernacular_pedagogy_platform-rishav/OneDrive/Documents/sih/Vernacular_pedagogy_platform-hariom/frontend"
+  command = "npm run build"
+  publish = "dist"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
